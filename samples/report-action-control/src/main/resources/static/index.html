@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flower Action Control</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17211d;
+      --muted: #66716b;
+      --line: #d9dfdb;
+      --panel: #ffffff;
+      --bg: #f4f6f4;
+      --green: #236a4a;
+      --green-soft: #e8f3ed;
+      --blue: #245f88;
+      --blue-soft: #eaf2f8;
+      --amber: #8a5a13;
+      --amber-soft: #fff5df;
+      --red: #963c35;
+      --red-soft: #fff0ee;
+      --violet: #69518e;
+      --violet-soft: #f1edf7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+    button { font: inherit; }
+    .shell { max-width: 1440px; margin: 0 auto; padding: 24px; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
+    h1 { margin: 0; font-size: 27px; line-height: 1.15; font-weight: 720; }
+    h1 span { color: var(--green); }
+    .subtitle { margin-top: 6px; color: var(--muted); }
+    .mode { display: flex; align-items: center; gap: 8px; color: var(--blue); font-weight: 700; }
+    .mode::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 4px var(--blue-soft); }
+
+    .toolbar, .panel { border: 1px solid var(--line); background: var(--panel); border-radius: 7px; }
+    .toolbar { padding: 14px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    .toolbar .divider { width: 1px; height: 30px; background: var(--line); margin: 0 4px; }
+    .btn { min-height: 36px; border: 1px solid #bcc7c1; background: #fff; color: var(--ink); padding: 7px 11px; border-radius: 5px; cursor: pointer; font-weight: 650; }
+    .btn:hover { border-color: #7d9086; background: #f8faf8; }
+    .btn.primary { background: var(--green); color: #fff; border-color: var(--green); }
+    .btn.ai { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .btn.warn { color: var(--amber); border-color: #d4b77e; }
+    .btn.danger { color: var(--red); border-color: #d6aaa5; }
+
+    .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+    .status-card { padding: 12px 14px; border: 1px solid var(--line); background: var(--panel); border-radius: 7px; min-width: 0; }
+    .label { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+    .value { font-weight: 720; overflow-wrap: anywhere; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+    .boundary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 7px; overflow: hidden; margin-bottom: 12px; }
+    .boundary div { background: #fff; padding: 11px; min-height: 61px; }
+    .boundary strong { display: block; font-size: 12px; margin-bottom: 4px; }
+    .boundary .runtime { background: var(--blue-soft); }
+
+    .top-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr); gap: 12px; align-items: start; }
+    .lower-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; align-items: start; }
+    .panel-head { padding: 13px 15px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .panel-head h2 { font-size: 15px; margin: 0; }
+    .panel-body { padding: 14px; }
+    .tag { display: inline-flex; align-items: center; min-height: 23px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 750; background: #edf0ee; color: #4e5b54; }
+    .tag.SUCCEEDED, .tag.done { background: var(--green-soft); color: var(--green); }
+    .tag.PENDING_APPROVAL, .tag.waiting { background: var(--amber-soft); color: var(--amber); }
+    .tag.DENIED, .tag.VALIDATION_FAILED, .tag.stopped { background: var(--violet-soft); color: var(--violet); }
+    .tag.FAILED, .tag.RUNTIME_FAILED, .tag.failed { background: var(--red-soft); color: var(--red); }
+    .tag.active { background: var(--blue-soft); color: var(--blue); }
+
+    .selected-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .meta-cell { border: 1px solid var(--line); background: #fbfcfb; border-radius: 5px; padding: 9px; min-width: 0; }
+    .run-id { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+
+    .rail { display: grid; gap: 7px; }
+    .step { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 9px; min-height: 58px; border: 1px solid var(--line); border-left: 4px solid #cbd2ce; padding: 8px 10px; border-radius: 5px; }
+    .step.done { border-left-color: var(--green); background: #fbfdfc; }
+    .step.waiting { border-left-color: #d3a653; background: var(--amber-soft); }
+    .step.stopped { border-left-color: var(--violet); background: var(--violet-soft); }
+    .step.failed { border-left-color: var(--red); background: var(--red-soft); }
+    .step.skipped { border-left-color: #d3a653; background: #fffdf7; }
+    .step-no { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: #edf0ee; color: #526058; font-size: 11px; font-weight: 750; }
+    .step strong { display: block; margin-bottom: 3px; font-size: 13px; overflow-wrap: anywhere; }
+
+    .approval-list, .run-list, .audit-list, .catalog { display: grid; gap: 7px; max-height: 430px; overflow: auto; }
+    .approval, .run-row, .action-row, .audit-row { border: 1px solid var(--line); border-radius: 5px; padding: 9px 10px; }
+    .approval-head, .run-row, .action-head { display: grid; align-items: center; gap: 9px; }
+    .approval-head { grid-template-columns: minmax(0, 1fr) auto; }
+    .run-row { grid-template-columns: 120px minmax(0, 1fr) 150px; cursor: pointer; }
+    .run-row:hover { border-color: #aebbb4; background: #fbfcfb; }
+    .action-head { grid-template-columns: minmax(0, 1fr) auto auto; }
+    .action-row .actions, .approval .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .mini { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+    .audit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+    .audit-row pre { margin-top: 5px; }
+    .empty { color: var(--muted); padding: 18px 4px; text-align: center; }
+    pre { margin: 0; max-height: 390px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; color: #344139; }
+
+    @media (max-width: 980px) {
+      .status-grid, .top-grid, .lower-grid { grid-template-columns: 1fr; }
+      .boundary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 620px) {
+      .shell { padding: 14px; }
+      header { align-items: flex-start; flex-direction: column; }
+      .status-grid, .selected-meta { grid-template-columns: 1fr 1fr; }
+      .run-row { grid-template-columns: 1fr; }
+      .toolbar .divider { display: none; }
+    }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header>
+    <div>
+      <h1><span>Flower</span> Action Control</h1>
+      <div class="subtitle">Direct, synchronous governance for a single business action</div>
+    </div>
+    <div class="mode">Caller thread owns execution</div>
+  </header>
+
+  <section class="toolbar">
+    <button class="btn primary" onclick="scenarioCreateUser()">User creates report</button>
+    <button class="btn ai" onclick="scenarioCreateAi()">AI proposes report</button>
+    <button class="btn" onclick="scenarioMissingTitle()">Invalid input</button>
+    <button class="btn danger" onclick="scenarioNotificationFail()">Executor failure</button>
+    <span class="divider"></span>
+    <button class="btn" onclick="scenarioDuplicate()">Duplicate request</button>
+    <button class="btn warn" onclick="scenarioCritical()">Critical delete</button>
+    <button class="btn danger" onclick="scenarioUnknown()">Unknown action</button>
+  </section>
+
+  <section class="status-grid">
+    <div class="status-card"><div class="label">Execution Mode</div><div class="value">DIRECT / SYNCHRONOUS</div></div>
+    <div class="status-card"><div class="label">Selected Action</div><div id="selectedAction" class="value">-</div></div>
+    <div class="status-card"><div class="label">Result</div><div id="selectedStatus" class="value">-</div></div>
+    <div class="status-card"><div class="label">Last HTTP Round Trip</div><div id="roundTrip" class="value">-</div></div>
+  </section>
+
+  <section class="boundary" aria-label="Direct execution boundary">
+    <div><strong>1. Caller</strong><span class="hint">UI, REST, batch, AI, or MCP submits a proposal</span></div>
+    <div class="runtime"><strong>2. Record + Deduplicate</strong><span class="hint">The same Java call enters the control envelope</span></div>
+    <div class="runtime"><strong>3. Resolve + Validate</strong><span class="hint">Registry and input checks run in order</span></div>
+    <div class="runtime"><strong>4. Policy</strong><span class="hint">Allow, deny, dry-run, or approval</span></div>
+    <div class="runtime"><strong>5. Execute</strong><span class="hint">Domain action runs only after gates pass</span></div>
+    <div><strong>6. Return</strong><span class="hint">SUCCEEDED, DENIED, FAILED, or PENDING_APPROVAL</span></div>
+  </section>
+
+  <section class="top-grid">
+    <article class="panel">
+      <div class="panel-head"><h2>Selected Run Pipeline</h2><span id="pipelineStatus" class="tag">NONE</span></div>
+      <div class="panel-body">
+        <div class="selected-meta">
+          <div class="meta-cell"><div class="label">Origin</div><div id="selectedOrigin" class="value">-</div></div>
+          <div class="meta-cell"><div class="label">Current Stage</div><div id="selectedStage" class="value">-</div></div>
+          <div class="meta-cell"><div class="label">Run ID</div><div id="selectedRunId" class="run-id">-</div></div>
+        </div>
+        <div id="pipeline" class="rail"><div class="empty">Run a scenario or select a run.</div></div>
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head"><h2>Approval Inbox</h2><span id="approvalCount" class="tag waiting">0</span></div>
+      <div id="approvals" class="panel-body approval-list"></div>
+    </article>
+  </section>
+
+  <section class="lower-grid">
+    <article class="panel">
+      <div class="panel-head"><h2>Run History</h2><span id="runCount" class="tag">0</span></div>
+      <div id="runs" class="panel-body run-list"></div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head"><h2>Action Catalog</h2><span id="actionCount" class="tag">0</span></div>
+      <div id="actions" class="panel-body catalog"></div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head"><h2>Selected Run Audit</h2><span class="tag">ordered</span></div>
+      <div id="audit" class="panel-body audit-list"><div class="empty">No run selected.</div></div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head"><h2>Domain State</h2><span class="tag done">source of truth</span></div>
+      <div class="panel-body"><pre id="state">{}</pre></div>
+    </article>
+  </section>
+</main>
+
+<script>
+const api = path => `/api${path}`;
+const STAGES = [
+  ["record-proposal", "Record requester, origin, reason, and start the audit trail."],
+  ["reserve-duplicate", "Reserve or return the idempotency result."],
+  ["resolve-action", "Load effect, risk, origins, and executor from the registry."],
+  ["validate-input", "Reject malformed input before policy and side effects."],
+  ["evaluate-policy", "Decide allow, deny, dry-run, stronger auth, or approval."],
+  ["execute-action", "Invoke the domain executor only after all gates pass."],
+  ["record-result", "Persist the final ActionRun and release duplicate bookkeeping."]
+];
+let selectedRunId = null;
+let selectedDetails = null;
+let duplicateKey = `dup-${Date.now()}`;
+let lastRoundTripMs = null;
+let refreshing = false;
+
+async function json(path, options = {}) {
+  const response = await fetch(api(path), {
+    headers: { "Content-Type": "application/json" },
+    ...options
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+function body(value) { return { method: "POST", body: JSON.stringify(value) }; }
+
+function inputFor(actionId, variant = "default") {
+  if (actionId === "report.create") return variant === "missing" ? {} : { title: "Site inspection draft" };
+  if (actionId === "report.submit") return { reportId: 1001 };
+  if (actionId === "project.delete") return { projectId: "project-1" };
+  if (actionId === "notification.send") return variant === "fail"
+    ? { channel: "email", message: "Please review", fail: true }
+    : { channel: "email", message: "Please review" };
+  if (actionId === "payment.refund") return { amount: 100, currency: "KRW" };
+  return {};
+}
+
+async function timed(operation) {
+  const started = performance.now();
+  const result = await operation();
+  lastRoundTripMs = Math.max(1, Math.round(performance.now() - started));
+  return result;
+}
+
+async function propose(actionId, origin, input = inputFor(actionId), key = null) {
+  const result = await timed(() => json(`/actions/${actionId}/propose`, body({
+    origin,
+    requesterId: origin === "AI_PLANNER" ? "planner-7" : "user-1001",
+    reason: `${origin} requested ${actionId}`,
+    confidence: origin === "AI_PLANNER" ? 0.82 : 1.0,
+    idempotencyKey: key,
+    input
+  })));
+  selectedRunId = result.runId;
+  await refresh();
+}
+
+async function approve(runId) {
+  await timed(() => json(`/approvals/${runId}/approve`, body({ resolvedBy: "manager-42" })));
+  selectedRunId = runId;
+  await refresh();
+}
+
+async function reject(runId) {
+  await timed(() => json(`/approvals/${runId}/reject`, body({
+    resolvedBy: "manager-42",
+    reason: "not safe enough"
+  })));
+  selectedRunId = runId;
+  await refresh();
+}
+
+function scenarioCreateUser() { return propose("report.create", "USER"); }
+function scenarioCreateAi() { return propose("report.create", "AI_PLANNER"); }
+function scenarioMissingTitle() { return propose("report.create", "USER", inputFor("report.create", "missing")); }
+function scenarioNotificationFail() { return propose("notification.send", "USER", inputFor("notification.send", "fail")); }
+function scenarioUnknown() { return propose("system.shutdown", "USER", {}); }
+function scenarioCritical() { return propose("project.delete", "USER"); }
+async function scenarioDuplicate() {
+  await propose("report.create", "USER", { title: "Duplicate-key report" }, duplicateKey);
+  await propose("report.create", "USER", { title: "Duplicate-key report again" }, duplicateKey);
+}
+
+async function refresh() {
+  if (refreshing) return;
+  refreshing = true;
+  try {
+    const [actions, approvals, runs, state] = await Promise.all([
+      json("/actions"), json("/approvals"), json("/runs"), json("/state")
+    ]);
+    renderActions(actions);
+    renderApprovals(approvals);
+    renderRuns(runs);
+    document.getElementById("state").textContent = JSON.stringify(state, null, 2);
+    document.getElementById("actionCount").textContent = actions.length;
+    document.getElementById("approvalCount").textContent = approvals.length;
+    document.getElementById("runCount").textContent = runs.length;
+    if (!selectedRunId && runs.length) selectedRunId = runs[0].runId;
+    if (selectedRunId) await renderSelected(selectedRunId);
+    renderSummary();
+  } finally {
+    refreshing = false;
+  }
+}
+
+function renderActions(actions) {
+  document.getElementById("actions").innerHTML = actions.map(action => `
+    <div class="action-row">
+      <div class="action-head">
+        <div><strong>${action.actionId}</strong><div class="hint">${action.description}</div></div>
+        <span class="tag">${action.effect}</span>
+        <span class="tag">${action.riskLevel}</span>
+      </div>
+      <div class="actions">
+        <button class="btn mini" onclick="propose('${action.actionId}', 'USER')">Run as user</button>
+        <button class="btn mini" onclick="propose('${action.actionId}', 'AI_PLANNER')">Propose as AI</button>
+      </div>
+    </div>`).join("");
+}
+
+function renderApprovals(runs) {
+  const root = document.getElementById("approvals");
+  root.innerHTML = runs.length ? runs.map(run => `
+    <div class="approval">
+      <div class="approval-head">
+        <div><strong>${run.actionId}</strong><div class="run-id">${run.runId}</div></div>
+        <span class="tag waiting">WAITING</span>
+      </div>
+      <div class="hint" style="margin-top:7px">${run.policyReason || "Human approval required"}</div>
+      <div class="actions">
+        <button class="btn mini primary" onclick="approve('${run.runId}')">Approve</button>
+        <button class="btn mini danger" onclick="reject('${run.runId}')">Reject</button>
+        <button class="btn mini" onclick="selectRun('${run.runId}')">Inspect</button>
+      </div>
+    </div>`).join("") : '<div class="empty">No pending approvals.</div>';
+}
+
+function renderRuns(runs) {
+  document.getElementById("runs").innerHTML = runs.length ? runs.map(run => `
+    <div class="run-row" onclick="selectRun('${run.runId}')">
+      <span class="tag ${run.result?.status || run.status}">${run.result?.status || run.status}</span>
+      <div><strong>${run.actionId}</strong><div class="hint">${run.currentStage || "-"}</div></div>
+      <div class="hint">${run.origin}<div class="run-id">${run.runId}</div></div>
+    </div>`).join("") : '<div class="empty">No action runs.</div>';
+}
+
+async function selectRun(runId) {
+  selectedRunId = runId;
+  await renderSelected(runId);
+  renderSummary();
+}
+
+async function renderSelected(runId) {
+  selectedDetails = await json(`/runs/${runId}`);
+  const run = selectedDetails.run;
+  document.getElementById("selectedOrigin").textContent = run.origin;
+  document.getElementById("selectedStage").textContent = run.currentStage || "-";
+  document.getElementById("selectedRunId").textContent = run.runId;
+  document.getElementById("pipeline").innerHTML = pipelineStages(selectedDetails).map((stage, index) => `
+    <div class="step ${stage.state}">
+      <span class="step-no">${index + 1}</span>
+      <div><strong>${stage.id}</strong><div class="hint">${stage.description}</div></div>
+      <span class="tag ${stage.state}">${stage.state}</span>
+    </div>`).join("");
+  document.getElementById("audit").innerHTML = selectedDetails.audit.length ? selectedDetails.audit.slice().reverse().map(event => `
+    <div class="audit-row">
+      <div><strong>${event.type}</strong><pre>${escapeHtml(JSON.stringify(event.payload || {}, null, 2))}</pre></div>
+      <span class="hint">${time(event.occurredAt)}</span>
+    </div>`).join("") : '<div class="empty">No audit events.</div>';
+}
+
+function pipelineStages(details) {
+  const run = details.run;
+  const types = new Set(details.audit.map(event => event.type));
+  const states = STAGES.map(() => "pending");
+  if (types.has("ACTION_PROPOSED")) { states[0] = "done"; states[1] = "done"; }
+  if (types.has("ACTION_RESOLVED")) states[2] = "done";
+  if (types.has("VALIDATION_COMPLETED")) states[3] = "done";
+  if (types.has("POLICY_EVALUATED")) states[4] = "done";
+  if (["ACTION_EXECUTION_STARTED", "ACTION_EXECUTION_COMPLETED", "DRY_RUN_COMPLETED"].some(type => types.has(type))) states[5] = "done";
+  if (types.has("ACTION_EXECUTION_FAILED") || types.has("ACTION_RUNTIME_FAILED")) states[5] = "failed";
+  if (run.result) states[6] = "done";
+
+  const result = run.result?.status || run.status;
+  if (result === "VALIDATION_FAILED") { states[3] = "stopped"; states[4] = "skipped"; states[5] = "skipped"; }
+  if (result === "PENDING_APPROVAL") { states[4] = "waiting"; states[5] = "skipped"; }
+  if (result === "DENIED") {
+    const stop = types.has("POLICY_EVALUATED") ? 4 : types.has("ACTION_RESOLVED") ? 2 : 1;
+    states[stop] = "stopped";
+    for (let i = stop + 1; i < 6; i++) states[i] = "skipped";
+  }
+  return STAGES.map(([id, description], index) => ({ id, description, state: states[index] }));
+}
+
+function renderSummary() {
+  const run = selectedDetails?.run;
+  const status = run?.result?.status || run?.status || "NONE";
+  document.getElementById("selectedAction").textContent = run?.actionId || "-";
+  document.getElementById("selectedStatus").textContent = status;
+  document.getElementById("roundTrip").textContent = lastRoundTripMs == null ? "-" : `${lastRoundTripMs} ms`;
+  const pipelineStatus = document.getElementById("pipelineStatus");
+  pipelineStatus.textContent = status;
+  pipelineStatus.className = `tag ${status}`;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+  })[char]);
+}
+
+function time(value) {
+  return value ? new Date(value).toLocaleTimeString() : "";
+}
+
+refresh();
+setInterval(refresh, 2500);
+</script>
+</body>
+</html>
