@@ -1,4 +1,4 @@
-package io.github.parkkevinsb.flower.action.runtime.samples.workflow;
+package io.github.flowerjvm.flower.action.runtime.samples.workflow;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

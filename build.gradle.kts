@@ -9,11 +9,10 @@ plugins {
 }
 
 allprojects {
-    group = "io.github.parkkevinsb.flower.action.runtime.samples"
+    group = "io.github.flowerjvm.flower.action.runtime.samples"
     version = "0.1.0-SNAPSHOT"
 
     repositories {
-        mavenLocal()
         mavenCentral()
     }
 }

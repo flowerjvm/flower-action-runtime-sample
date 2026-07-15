@@ -1,7 +1,7 @@
-package io.github.parkkevinsb.flower.action.runtime.samples.workflow;
+package io.github.flowerjvm.flower.action.runtime.samples.workflow;
 
-import io.github.parkkevinsb.flower.core.flow.FlowSnapshot;
-import io.github.parkkevinsb.flower.core.listener.FlowerListener;
+import io.github.flowerjvm.flower.core.flow.FlowSnapshot;
+import io.github.flowerjvm.flower.core.listener.FlowerListener;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;

@@ -1,10 +1,9 @@
-package io.github.parkkevinsb.flower.action.runtime.samples.report;
+package io.github.flowerjvm.flower.action.runtime.samples.workflow;
 
-import io.github.parkkevinsb.flower.action.runtime.audit.AuditEvent;
-import io.github.parkkevinsb.flower.action.runtime.audit.AuditSink;
-import io.github.parkkevinsb.flower.action.runtime.run.ActionRun;
-import io.github.parkkevinsb.flower.action.runtime.run.ActionRunStatus;
-import io.github.parkkevinsb.flower.action.runtime.run.RunStore;
+import io.github.flowerjvm.flower.action.runtime.audit.AuditEvent;
+import io.github.flowerjvm.flower.action.runtime.audit.AuditSink;
+import io.github.flowerjvm.flower.action.runtime.run.ActionRun;
+import io.github.flowerjvm.flower.action.runtime.run.RunStore;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -12,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-final class RecordingRunStore implements RunStore {
+final class WorkflowRunStore implements RunStore {
     private final ConcurrentMap<String, ActionRun> byId = new ConcurrentHashMap<>();
 
     @Override
@@ -33,26 +32,20 @@ final class RecordingRunStore implements RunStore {
 
     @Override
     public List<ActionRun> findResumable(String tenantId) {
-        return all(tenantId).stream()
+        return all().stream()
+                .filter(run -> tenantId == null || tenantId.isBlank() || run.tenantId().equals(tenantId))
                 .filter(run -> !run.status().isTerminal())
                 .toList();
     }
 
-    List<ActionRun> all(String tenantId) {
+    List<ActionRun> all() {
         return byId.values().stream()
-                .filter(run -> tenantId == null || tenantId.isBlank() || run.tenantId().equals(tenantId))
                 .sorted(Comparator.comparing(ActionRun::updatedAt).reversed())
-                .toList();
-    }
-
-    List<ActionRun> waitingApprovals(String tenantId) {
-        return all(tenantId).stream()
-                .filter(run -> run.status() == ActionRunStatus.WAITING_APPROVAL)
                 .toList();
     }
 }
 
-final class RecordingAuditSink implements AuditSink {
+final class WorkflowAuditSink implements AuditSink {
     private final CopyOnWriteArrayList<AuditEvent> events = new CopyOnWriteArrayList<>();
 
     @Override

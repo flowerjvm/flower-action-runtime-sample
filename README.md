@@ -42,27 +42,10 @@ caller -> submit business Flow -> return
 ## Prerequisites
 
 - Java 21
-- The runtime repository checked out next to this repository
 
-Until the runtime artifacts are published, the Gradle helper modules compile
-the public sources from the neighboring checkout:
-
-```text
-git/
-  flower-action-runtime/
-  flower-action-runtime-sample/
-```
-
-Clone both repositories into that shape:
-
-```bash
-git clone https://github.com/flowerjvm/flower-action-runtime.git
-git clone https://github.com/flowerjvm/flower-action-runtime-sample.git
-```
-
-The helper modules are local development bridges only. The sample applications
-use the public `flower-action-runtime-core` and
-`flower-action-runtime-workflow` APIs.
+The sample applications resolve `flower-action-runtime-core:0.1.0` and
+`flower-action-runtime-workflow:0.1.0` directly from Maven Central. A neighboring
+runtime source checkout and `mavenLocal()` are not required.
 
 ## Run The Direct Sample
 
