@@ -77,7 +77,8 @@ class WorkflowSampleConfig {
                 Instant.now(),
                 Map.of(
                         "actionId", proposal.actionId(),
-                        "origin", proposal.origin().name(),
+                        "requestChannel", proposal.requestChannel().name(),
+                        "proposerType", proposal.proposerType().name(),
                         "stage", "evaluate-policy"));
     }
 

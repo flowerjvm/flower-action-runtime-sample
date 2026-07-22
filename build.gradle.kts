@@ -10,7 +10,7 @@ plugins {
 
 allprojects {
     group = "io.github.flowerjvm.flower.action.runtime.samples"
-    version = "0.1.0-SNAPSHOT"
+    version = "0.3.0"
 
     repositories {
         mavenCentral()

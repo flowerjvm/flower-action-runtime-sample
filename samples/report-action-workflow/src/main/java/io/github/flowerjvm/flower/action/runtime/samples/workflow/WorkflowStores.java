@@ -10,13 +10,16 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 final class WorkflowRunStore implements RunStore {
     private final ConcurrentMap<String, ActionRun> byId = new ConcurrentHashMap<>();
 
     @Override
     public ActionRun create(ActionRun run) {
-        byId.put(run.runId(), run);
+        if (byId.putIfAbsent(run.runId(), run) != null) {
+            throw new IllegalStateException("Action run already exists: " + run.runId());
+        }
         return run;
     }
 
@@ -26,8 +29,22 @@ final class WorkflowRunStore implements RunStore {
     }
 
     @Override
-    public void update(ActionRun run) {
-        byId.put(run.runId(), run);
+    public boolean compareAndSet(ActionRun expected, ActionRun updated) {
+        if (!expected.runId().equals(updated.runId())) {
+            throw new IllegalArgumentException("compare-and-set run ids must match");
+        }
+        if (updated.version() != expected.version() + 1L) {
+            throw new IllegalArgumentException("updated run version must be expected version + 1");
+        }
+        AtomicBoolean changed = new AtomicBoolean(false);
+        byId.computeIfPresent(expected.runId(), (runId, current) -> {
+            if (current.version() != expected.version()) {
+                return current;
+            }
+            changed.set(true);
+            return updated;
+        });
+        return changed.get();
     }
 
     @Override

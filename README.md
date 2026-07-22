@@ -10,7 +10,9 @@ ActionProposal
  -> registry
  -> validation
  -> policy
+ -> duplicate reservation
  -> optional approval
+ -> pre-execution check
  -> execution
  -> ActionRun
  -> audit trail
@@ -43,8 +45,8 @@ caller -> submit business Flow -> return
 
 - Java 21
 
-The sample applications resolve `flower-action-runtime-core:0.1.0` and
-`flower-action-runtime-workflow:0.1.0` directly from Maven Central. A neighboring
+The sample applications resolve `flower-action-runtime-core:0.3.0` and
+`flower-action-runtime-workflow:0.3.0` directly from Maven Central. A neighboring
 runtime source checkout and `mavenLocal()` are not required.
 
 ## Run The Direct Sample

@@ -7,10 +7,12 @@ Every UI, REST, batch, AI, or MCP request becomes an `ActionProposal`. The calle
 ```text
 caller
   -> record-proposal
-  -> reserve-duplicate
   -> resolve-action
   -> validate-input
   -> evaluate-policy
+  -> reserve-duplicate
+  -> request-approval
+  -> pre-execution-check
   -> execute-action
   -> record-result
   -> ActionExecutionResult
@@ -40,4 +42,4 @@ Open [http://localhost:8080](http://localhost:8080).
 - Critical delete: default policy requires approval.
 - Unknown action: registry resolution denies the proposal.
 
-The screen keeps the action catalog and run history available, but the selected run pipeline is the primary view. Its fixed seven-stage rail shows exactly where the direct call passed, waited, stopped, or failed.
+The screen keeps the action catalog and run history available, but the selected run pipeline is the primary view. Its fixed nine-stage rail shows exactly where the direct call passed, waited, stopped, or failed.

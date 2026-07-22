@@ -145,7 +145,7 @@
 
   <section class="boundary" aria-label="Direct execution boundary">
     <div><strong>1. Caller</strong><span class="hint">UI, REST, batch, AI, or MCP submits a proposal</span></div>
-    <div class="runtime"><strong>2. Record + Deduplicate</strong><span class="hint">The same Java call enters the control envelope</span></div>
+    <div class="runtime"><strong>2. Record + Govern</strong><span class="hint">The same Java call enters the control envelope</span></div>
     <div class="runtime"><strong>3. Resolve + Validate</strong><span class="hint">Registry and input checks run in order</span></div>
     <div class="runtime"><strong>4. Policy</strong><span class="hint">Allow, deny, dry-run, or approval</span></div>
     <div class="runtime"><strong>5. Execute</strong><span class="hint">Domain action runs only after gates pass</span></div>
@@ -157,7 +157,7 @@
       <div class="panel-head"><h2>Selected Run Pipeline</h2><span id="pipelineStatus" class="tag">NONE</span></div>
       <div class="panel-body">
         <div class="selected-meta">
-          <div class="meta-cell"><div class="label">Origin</div><div id="selectedOrigin" class="value">-</div></div>
+          <div class="meta-cell"><div class="label">Channel / Proposer</div><div id="selectedIdentity" class="value">-</div></div>
           <div class="meta-cell"><div class="label">Current Stage</div><div id="selectedStage" class="value">-</div></div>
           <div class="meta-cell"><div class="label">Run ID</div><div id="selectedRunId" class="run-id">-</div></div>
         </div>
@@ -197,11 +197,13 @@
 <script>
 const api = path => `/api${path}`;
 const STAGES = [
-  ["record-proposal", "Record requester, origin, reason, and start the audit trail."],
-  ["reserve-duplicate", "Reserve or return the idempotency result."],
-  ["resolve-action", "Load effect, risk, origins, and executor from the registry."],
+  ["record-proposal", "Record channel, proposer, requester, reason, and audit context."],
+  ["resolve-action", "Load effect, risk, allowed identities, and executor from the registry."],
   ["validate-input", "Reject malformed input before policy and side effects."],
   ["evaluate-policy", "Decide allow, deny, dry-run, stronger auth, or approval."],
+  ["reserve-duplicate", "Reserve the tenant/action-scoped idempotency result."],
+  ["request-approval", "Create a human approval request when policy requires one."],
+  ["pre-execution-check", "Recheck host state immediately before the side effect."],
   ["execute-action", "Invoke the domain executor only after all gates pass."],
   ["record-result", "Persist the final ActionRun and release duplicate bookkeeping."]
 ];
@@ -240,12 +242,13 @@ async function timed(operation) {
   return result;
 }
 
-async function propose(actionId, origin, input = inputFor(actionId), key = null) {
+async function propose(actionId, proposerType, input = inputFor(actionId), key = null) {
   const result = await timed(() => json(`/actions/${actionId}/propose`, body({
-    origin,
-    requesterId: origin === "AI_PLANNER" ? "planner-7" : "user-1001",
-    reason: `${origin} requested ${actionId}`,
-    confidence: origin === "AI_PLANNER" ? 0.82 : 1.0,
+    requestChannel: "UI",
+    proposerType,
+    requesterId: proposerType === "AI_PLANNER" ? "planner-7" : "user-1001",
+    reason: `${proposerType} proposed ${actionId} through UI`,
+    confidence: proposerType === "AI_PLANNER" ? 0.82 : 1.0,
     idempotencyKey: key,
     input
   })));
@@ -338,7 +341,7 @@ function renderRuns(runs) {
     <div class="run-row" onclick="selectRun('${run.runId}')">
       <span class="tag ${run.result?.status || run.status}">${run.result?.status || run.status}</span>
       <div><strong>${run.actionId}</strong><div class="hint">${run.currentStage || "-"}</div></div>
-      <div class="hint">${run.origin}<div class="run-id">${run.runId}</div></div>
+      <div class="hint">${run.requestChannel} / ${run.proposerType}<div class="run-id">${run.runId}</div></div>
     </div>`).join("") : '<div class="empty">No action runs.</div>';
 }
 
@@ -351,7 +354,7 @@ async function selectRun(runId) {
 async function renderSelected(runId) {
   selectedDetails = await json(`/runs/${runId}`);
   const run = selectedDetails.run;
-  document.getElementById("selectedOrigin").textContent = run.origin;
+  document.getElementById("selectedIdentity").textContent = `${run.requestChannel} / ${run.proposerType}`;
   document.getElementById("selectedStage").textContent = run.currentStage || "-";
   document.getElementById("selectedRunId").textContent = run.runId;
   document.getElementById("pipeline").innerHTML = pipelineStages(selectedDetails).map((stage, index) => `
@@ -371,21 +374,35 @@ function pipelineStages(details) {
   const run = details.run;
   const types = new Set(details.audit.map(event => event.type));
   const states = STAGES.map(() => "pending");
-  if (types.has("ACTION_PROPOSED")) { states[0] = "done"; states[1] = "done"; }
-  if (types.has("ACTION_RESOLVED")) states[2] = "done";
-  if (types.has("VALIDATION_COMPLETED")) states[3] = "done";
-  if (types.has("POLICY_EVALUATED")) states[4] = "done";
-  if (["ACTION_EXECUTION_STARTED", "ACTION_EXECUTION_COMPLETED", "DRY_RUN_COMPLETED"].some(type => types.has(type))) states[5] = "done";
-  if (types.has("ACTION_EXECUTION_FAILED") || types.has("ACTION_RUNTIME_FAILED")) states[5] = "failed";
-  if (run.result) states[6] = "done";
+  const currentIndex = STAGES.findIndex(([id]) => id === run.currentStage);
+  if (currentIndex >= 0) {
+    for (let i = 0; i <= currentIndex; i++) states[i] = "done";
+  }
+  if (types.has("ACTION_PROPOSED")) states[0] = "done";
+  if (types.has("ACTION_RESOLVED")) states[1] = "done";
+  if (types.has("VALIDATION_COMPLETED")) states[2] = "done";
+  if (types.has("POLICY_EVALUATED") || types.has("POLICY_REEVALUATED")) states[3] = "done";
+  if (types.has("ACTION_DUPLICATE")) states[4] = "stopped";
+  if (types.has("APPROVAL_REQUESTED")) states[5] = "done";
+  if (types.has("PRE_EXECUTION_CHECKED")) states[6] = "done";
+  if (["ACTION_EXECUTION_STARTED", "ACTION_EXECUTION_COMPLETED", "DRY_RUN_COMPLETED"].some(type => types.has(type))) states[7] = "done";
+  if (types.has("ACTION_EXECUTION_FAILED") || types.has("ACTION_RUNTIME_FAILED")) states[7] = "failed";
+  if (run.result) states[8] = "done";
 
   const result = run.result?.status || run.status;
-  if (result === "VALIDATION_FAILED") { states[3] = "stopped"; states[4] = "skipped"; states[5] = "skipped"; }
-  if (result === "PENDING_APPROVAL") { states[4] = "waiting"; states[5] = "skipped"; }
+  if (result === "VALIDATION_FAILED") {
+    states[2] = "stopped";
+    for (let i = 3; i < 8; i++) states[i] = "skipped";
+  }
+  if (result === "PENDING_APPROVAL") {
+    states[5] = "waiting";
+    states[6] = "skipped";
+    states[7] = "skipped";
+  }
   if (result === "DENIED") {
-    const stop = types.has("POLICY_EVALUATED") ? 4 : types.has("ACTION_RESOLVED") ? 2 : 1;
+    const stop = Math.max(0, currentIndex);
     states[stop] = "stopped";
-    for (let i = stop + 1; i < 6; i++) states[i] = "skipped";
+    for (let i = stop + 1; i < 8; i++) states[i] = "skipped";
   }
   return STAGES.map(([id, description], index) => ({ id, description, state: states[index] }));
 }

@@ -1,8 +1,9 @@
 package io.github.flowerjvm.flower.action.runtime.samples.workflow;
 
 import io.github.flowerjvm.flower.action.runtime.ActionExecutionResult;
-import io.github.flowerjvm.flower.action.runtime.ActionOrigin;
+import io.github.flowerjvm.flower.action.runtime.ActionProposerType;
 import io.github.flowerjvm.flower.action.runtime.ActionProposal;
+import io.github.flowerjvm.flower.action.runtime.ActionRequestChannel;
 import io.github.flowerjvm.flower.action.runtime.DefaultActionRuntime;
 import io.github.flowerjvm.flower.action.runtime.ExecutionContext;
 import io.github.flowerjvm.flower.action.runtime.approval.ApprovalDecision;
@@ -35,10 +36,12 @@ final class WorkflowLabService {
             "publish-report");
     private static final List<String> ACTION_STAGE_IDS = List.of(
             "record-proposal",
-            "reserve-duplicate",
             "resolve-action",
             "validate-input",
             "evaluate-policy",
+            "reserve-duplicate",
+            "request-approval",
+            "pre-execution-check",
             "execute-action",
             "record-result");
 
@@ -73,16 +76,15 @@ final class WorkflowLabService {
         Scenario scenario = scenario(scenarioName);
         String workflowRunId = "workflow-" + UUID.randomUUID();
         String actionRunId = "action-" + UUID.randomUUID();
-        ActionProposal proposal = new ActionProposal(
-                null,
-                scenario.actionId(),
-                scenario.origin(),
-                scenario.origin().name().toLowerCase() + "-sample",
-                scenario.reason(),
-                scenario.origin() == ActionOrigin.AI_PLANNER ? 0.82d : 1.0d,
-                scenario.input(),
-                null,
-                Map.of("sample", "report-action-workflow", "scenario", scenario.name()));
+        ActionProposal proposal = ActionProposal.builder(scenario.actionId())
+                .requestChannel(ActionRequestChannel.COMMAND)
+                .proposerType(scenario.proposerType())
+                .requesterId(scenario.proposerType().name().toLowerCase() + "-sample")
+                .reason(scenario.reason())
+                .confidence(scenario.proposerType() == ActionProposerType.AI_PLANNER ? 0.82d : 1.0d)
+                .input(scenario.input())
+                .metadata(Map.of("sample", "report-action-workflow", "scenario", scenario.name()))
+                .build();
         ExecutionContext actionContext = new ExecutionContext(
                 TENANT_ID,
                 proposal.requesterId(),
@@ -309,7 +311,8 @@ final class WorkflowLabService {
         return new ControlContext(
                 lab.scenario().title(),
                 lab.proposal().actionId(),
-                lab.proposal().origin().name(),
+                lab.proposal().requestChannel().name(),
+                lab.proposal().proposerType().name(),
                 lab.proposal().requesterId(),
                 lab.proposal().input(),
                 lab.scenario().controlExpectation(),
@@ -332,10 +335,12 @@ final class WorkflowLabService {
     private static String actionStageDescription(String stepId) {
         return switch (stepId) {
             case "record-proposal" -> "Record who requested the action and start the audit trail.";
-            case "reserve-duplicate" -> "Reserve the idempotency key so the same request cannot run twice.";
             case "resolve-action" -> "Load action risk and effect metadata from the registry.";
             case "validate-input" -> "Validate input before policy or execution.";
             case "evaluate-policy" -> "Decide allow, deny, dry-run, or approval.";
+            case "reserve-duplicate" -> "Reserve the tenant/action-scoped idempotency key.";
+            case "request-approval" -> "Create an approval request when policy requires a human decision.";
+            case "pre-execution-check" -> "Recheck host state immediately before the side effect.";
             case "execute-action" -> "Run the domain action only after every control gate passes.";
             case "record-result" -> "Finalize run and duplicate bookkeeping.";
             default -> "";
@@ -348,7 +353,7 @@ final class WorkflowLabService {
                     "ai-approval",
                     "AI proposes report creation",
                     "report.create",
-                    ActionOrigin.AI_PLANNER,
+                    ActionProposerType.AI_PLANNER,
                     Map.of("title", "AI generated inspection draft"),
                     "AI prepared a report after document upload.",
                     "The business Flow waits for the document. Then AI_PLANNER + WRITE reaches policy and waits for human approval.");
@@ -356,7 +361,7 @@ final class WorkflowLabService {
                     "validation-failure",
                     "Invalid report request",
                     "report.create",
-                    ActionOrigin.USER,
+                    ActionProposerType.USER,
                     Map.of(),
                     "The uploaded document has no report title.",
                     "After the external event, validation rejects the action and the parent business Flow fails safely.");
@@ -364,7 +369,7 @@ final class WorkflowLabService {
                     "execution-failure",
                     "Notification provider failure",
                     "notification.send",
-                    ActionOrigin.USER,
+                    ActionProposerType.USER,
                     Map.of("fail", true),
                     "Publish a completion notification after document upload.",
                     "Validation and policy pass, then execute-action captures the provider failure and the parent Flow observes it.");
@@ -372,7 +377,7 @@ final class WorkflowLabService {
                     "success",
                     "User publishes an inspection report",
                     "report.create",
-                    ActionOrigin.USER,
+                    ActionProposerType.USER,
                     Map.of("title", "Site inspection report"),
                     "Create the report only after its source document arrives.",
                     "The business Flow waits asynchronously, then submits a governed write action and waits for its result.");
@@ -383,7 +388,7 @@ final class WorkflowLabService {
             String name,
             String title,
             String actionId,
-            ActionOrigin origin,
+            ActionProposerType proposerType,
             Map<String, Object> input,
             String reason,
             String controlExpectation) {
@@ -440,7 +445,8 @@ final class WorkflowLabService {
     record ControlContext(
             String title,
             String actionId,
-            String origin,
+            String requestChannel,
+            String proposerType,
             String requester,
             Map<String, Object> input,
             String expectedControl,

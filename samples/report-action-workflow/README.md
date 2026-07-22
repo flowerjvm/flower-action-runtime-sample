@@ -13,11 +13,13 @@ ReportPublicationFlow                    Controlled Action Flow
   prepare-report
   wait-document-upload  <--- UI event
   submit-controlled-action ------------> record-proposal
-  wait-controlled-action                 reserve-duplicate
-                                         resolve-action
+  wait-controlled-action                 resolve-action
                                          validate-input
                                          evaluate-policy
-                                           \-> optional approval
+                                         reserve-duplicate
+                                         request-approval
+                                           \-> optional human wait
+                                         pre-execution-check
                                          execute-action
                                          record-result
   publish-report        <--------------- action result

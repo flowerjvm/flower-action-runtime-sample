@@ -1,18 +1,31 @@
 package io.github.flowerjvm.flower.action.runtime.samples.report;
 
 import io.github.flowerjvm.flower.action.runtime.ActionExecutionResult;
-import io.github.flowerjvm.flower.action.runtime.ActionOrigin;
+import io.github.flowerjvm.flower.action.runtime.ActionProposerType;
+import io.github.flowerjvm.flower.action.runtime.ActionRequestChannel;
 import io.github.flowerjvm.flower.action.runtime.action.ActionDefinition;
 import io.github.flowerjvm.flower.action.runtime.action.ActionEffect;
 import io.github.flowerjvm.flower.action.runtime.action.ActionExecutionContext;
-import io.github.flowerjvm.flower.action.runtime.action.ActionExecutor;
 import io.github.flowerjvm.flower.action.runtime.action.ActionRiskLevel;
+import io.github.flowerjvm.flower.action.runtime.action.SynchronousActionExecutor;
 import java.util.Map;
 import java.util.Set;
 
-abstract class SampleAction implements ActionExecutor {
-    private static final Set<ActionOrigin> ALL_ORIGINS =
-            Set.of(ActionOrigin.USER, ActionOrigin.UI, ActionOrigin.API, ActionOrigin.AI_PLANNER);
+abstract class SampleAction implements SynchronousActionExecutor {
+    private static final Set<ActionRequestChannel> ALL_REQUEST_CHANNELS =
+            Set.of(
+                    ActionRequestChannel.UI,
+                    ActionRequestChannel.API,
+                    ActionRequestChannel.CLI,
+                    ActionRequestChannel.COMMAND);
+    private static final Set<ActionProposerType> ALL_PROPOSER_TYPES =
+            Set.of(
+                    ActionProposerType.USER,
+                    ActionProposerType.AI_PLANNER,
+                    ActionProposerType.SYSTEM,
+                    ActionProposerType.SERVICE);
+    private static final Set<ActionProposerType> NON_AI_PROPOSER_TYPES =
+            Set.of(ActionProposerType.USER, ActionProposerType.SYSTEM, ActionProposerType.SERVICE);
 
     private final ActionDefinition definition;
 
@@ -22,7 +35,8 @@ abstract class SampleAction implements ActionExecutor {
             String description,
             ActionEffect effect,
             ActionRiskLevel riskLevel,
-            Set<ActionOrigin> origins,
+            Set<ActionRequestChannel> requestChannels,
+            Set<ActionProposerType> proposerTypes,
             boolean dryRunSupported,
             boolean approvalRequiredByDefault) {
         this.definition = new ActionDefinition(
@@ -31,7 +45,8 @@ abstract class SampleAction implements ActionExecutor {
                 description,
                 effect,
                 riskLevel,
-                origins,
+                requestChannels,
+                proposerTypes,
                 Set.of(),
                 dryRunSupported,
                 approvalRequiredByDefault,
@@ -46,8 +61,16 @@ abstract class SampleAction implements ActionExecutor {
         return definition;
     }
 
-    static Set<ActionOrigin> allOrigins() {
-        return ALL_ORIGINS;
+    static Set<ActionRequestChannel> allRequestChannels() {
+        return ALL_REQUEST_CHANNELS;
+    }
+
+    static Set<ActionProposerType> allProposerTypes() {
+        return ALL_PROPOSER_TYPES;
+    }
+
+    static Set<ActionProposerType> nonAiProposerTypes() {
+        return NON_AI_PROPOSER_TYPES;
     }
 
     protected static String string(Object value, String fallback) {
@@ -74,7 +97,8 @@ final class ReportViewAction extends SampleAction {
 
     ReportViewAction(SampleState state) {
         super("report.view", "View reports", "Read the current in-memory reports.",
-                ActionEffect.READ_ONLY, ActionRiskLevel.LOW, allOrigins(), false, false);
+                ActionEffect.READ_ONLY, ActionRiskLevel.LOW,
+                allRequestChannels(), allProposerTypes(), false, false);
         this.state = state;
     }
 
@@ -89,7 +113,8 @@ final class ReportCreateAction extends SampleAction {
 
     ReportCreateAction(SampleState state) {
         super("report.create", "Create report", "Create a draft report.",
-                ActionEffect.WRITE, ActionRiskLevel.MEDIUM, allOrigins(), false, false);
+                ActionEffect.WRITE, ActionRiskLevel.MEDIUM,
+                allRequestChannels(), allProposerTypes(), false, false);
         this.state = state;
     }
 
@@ -107,7 +132,8 @@ final class ReportSubmitAction extends SampleAction {
 
     ReportSubmitAction(SampleState state) {
         super("report.submit", "Submit report", "Submit a report; approval is required by default.",
-                ActionEffect.WRITE, ActionRiskLevel.MEDIUM, allOrigins(), false, true);
+                ActionEffect.WRITE, ActionRiskLevel.MEDIUM,
+                allRequestChannels(), allProposerTypes(), false, true);
         this.state = state;
     }
 
@@ -124,7 +150,7 @@ final class ProjectDeleteAction extends SampleAction {
     ProjectDeleteAction(SampleState state) {
         super("project.delete", "Delete project", "Critical action; default policy requires approval.",
                 ActionEffect.PRODUCTION_CHANGE, ActionRiskLevel.CRITICAL,
-                Set.of(ActionOrigin.USER, ActionOrigin.UI, ActionOrigin.API), false, false);
+                allRequestChannels(), nonAiProposerTypes(), false, false);
         this.state = state;
     }
 
@@ -142,7 +168,7 @@ final class NotificationSendAction extends SampleAction {
     NotificationSendAction(SampleState state) {
         super("notification.send", "Send notification", "External send; fail=true triggers executor failure.",
                 ActionEffect.EXTERNAL_SEND, ActionRiskLevel.MEDIUM,
-                Set.of(ActionOrigin.USER, ActionOrigin.UI, ActionOrigin.API), false, false);
+                allRequestChannels(), nonAiProposerTypes(), false, false);
         this.state = state;
     }
 
@@ -165,7 +191,7 @@ final class PaymentRefundAction extends SampleAction {
     PaymentRefundAction(SampleState state) {
         super("payment.refund", "Refund payment", "High-risk financial action.",
                 ActionEffect.FINANCIAL, ActionRiskLevel.HIGH,
-                Set.of(ActionOrigin.USER, ActionOrigin.UI, ActionOrigin.API), true, false);
+                allRequestChannels(), nonAiProposerTypes(), true, false);
         this.state = state;
     }
 

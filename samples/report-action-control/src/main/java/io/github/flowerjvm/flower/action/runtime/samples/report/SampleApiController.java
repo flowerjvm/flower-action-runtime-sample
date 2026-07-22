@@ -2,8 +2,9 @@ package io.github.flowerjvm.flower.action.runtime.samples.report;
 
 import io.github.flowerjvm.flower.action.runtime.ActionExecutionResult;
 import io.github.flowerjvm.flower.action.runtime.ActionExecutionStatus;
-import io.github.flowerjvm.flower.action.runtime.ActionOrigin;
+import io.github.flowerjvm.flower.action.runtime.ActionProposerType;
 import io.github.flowerjvm.flower.action.runtime.ActionProposal;
+import io.github.flowerjvm.flower.action.runtime.ActionRequestChannel;
 import io.github.flowerjvm.flower.action.runtime.DefaultActionRuntime;
 import io.github.flowerjvm.flower.action.runtime.ExecutionContext;
 import io.github.flowerjvm.flower.action.runtime.action.ActionDefinition;
@@ -55,24 +56,34 @@ class SampleApiController {
     @PostMapping("/actions/{actionId}/propose")
     ActionResponse propose(@PathVariable String actionId, @RequestBody ProposeRequest request) {
         String runId = UUID.randomUUID().toString();
-        ActionOrigin origin = request.origin() == null ? ActionOrigin.USER : request.origin();
-        String requesterId = blank(request.requesterId()) ? origin.name().toLowerCase() + "-sample" : request.requesterId();
-        ActionProposal proposal = new ActionProposal(
-                null,
-                actionId,
-                origin,
-                requesterId,
-                blank(request.reason()) ? "sample proposal" : request.reason(),
-                request.confidence() == null ? 1.0d : request.confidence(),
-                request.input() == null ? Map.of() : request.input(),
-                request.idempotencyKey(),
-                Map.of("sample", "report-action-control"));
+        ActionRequestChannel requestChannel = request.requestChannel() == null
+                ? ActionRequestChannel.UI
+                : request.requestChannel();
+        ActionProposerType proposerType = request.proposerType() == null
+                ? ActionProposerType.USER
+                : request.proposerType();
+        String requesterId = blank(request.requesterId())
+                ? proposerType.name().toLowerCase() + "-sample"
+                : request.requesterId();
+        ActionProposal proposal = ActionProposal.builder(actionId)
+                .requestChannel(requestChannel)
+                .proposerType(proposerType)
+                .requesterId(requesterId)
+                .reason(blank(request.reason()) ? "sample proposal" : request.reason())
+                .confidence(request.confidence() == null ? 1.0d : request.confidence())
+                .input(request.input() == null ? Map.of() : request.input())
+                .idempotencyKey(request.idempotencyKey())
+                .metadata(Map.of("sample", "report-action-control"))
+                .build();
         ExecutionContext context = new ExecutionContext(
                 TENANT_ID,
                 requesterId,
                 runId,
                 runId + "-trace",
-                Map.of("origin", origin.name(), "sample", "report-action-control"));
+                Map.of(
+                        "requestChannel", requestChannel.name(),
+                        "proposerType", proposerType.name(),
+                        "sample", "report-action-control"));
 
         ActionExecutionResult result = runtime.handle(proposal, context);
         return ActionResponse.from(runId, result);
@@ -131,7 +142,8 @@ class SampleApiController {
     }
 
     record ProposeRequest(
-            ActionOrigin origin,
+            ActionRequestChannel requestChannel,
+            ActionProposerType proposerType,
             String requesterId,
             String reason,
             Double confidence,

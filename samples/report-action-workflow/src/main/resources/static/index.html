@@ -247,7 +247,7 @@ function render(state) {
   document.getElementById("policyDecision").className = `tag ${tagClass(ctx.policyDecision)}`;
   document.getElementById("controlContext").innerHTML = `
     <div class="value">${ctx.title}</div>
-    <div class="hint" style="margin-top:7px">${ctx.origin} / ${ctx.requester} / ${ctx.actionId}</div>
+    <div class="hint" style="margin-top:7px">${ctx.requestChannel} / ${ctx.proposerType} / ${ctx.requester} / ${ctx.actionId}</div>
     <div class="hint" style="margin-top:7px">${ctx.expectedControl}</div>
     <pre style="margin-top:10px">${escapeHtml(JSON.stringify(ctx.input, null, 2))}</pre>`;
 

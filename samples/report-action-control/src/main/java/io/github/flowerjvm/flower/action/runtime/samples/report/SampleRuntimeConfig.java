@@ -61,7 +61,8 @@ class SampleRuntimeConfig {
                 Instant.now(),
                 Map.of(
                         "actionId", proposal.actionId(),
-                        "origin", proposal.origin().name(),
+                        "requestChannel", proposal.requestChannel().name(),
+                        "proposerType", proposal.proposerType().name(),
                         "riskLevel", definition.riskLevel().name(),
                         "effect", definition.effect().name()));
     }
