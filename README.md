@@ -45,14 +45,14 @@ caller -> submit business Flow -> return
 
 - Java 21
 
-The sample applications resolve `flower-action-runtime-core:0.3.1` and
-`flower-action-runtime-workflow:0.3.1` directly from Maven Central. A neighboring
+The sample applications resolve `flower-action-runtime-core:0.3.2` and
+`flower-action-runtime-workflow:0.3.2` directly from Maven Central. A neighboring
 runtime source checkout and `mavenLocal()` are not required.
 
-The workflow sample also declares `flower-core:0.1.1` directly because its
+The workflow sample also declares `flower-core:0.1.2` directly because its
 application code imports Flower Engine, Flow, and Worker APIs. This both keeps
-the direct dependency explicit and verifies Action Runtime `0.3.1` compatibility
-with Flower `0.1.1`.
+the direct dependency explicit and verifies Action Runtime `0.3.2` compatibility
+with Flower `0.1.2`.
 
 ## Run The Direct Sample
 
